@@ -685,6 +685,11 @@ class NostrService {
           _userFeedStreamController.sink.add(_userFeed);
           return;
         }
+
+        // reactions
+        if (eventMap["kind"] == 7) {
+          _addLikesToTweet(eventMap, _userFeed);
+        }
       }
       return;
     }
@@ -1065,7 +1070,7 @@ class NostrService {
 
     var body1 = {
       "authors": users,
-      "kinds": [1],
+      "kinds": [1, 7],
       "limit": limit ?? defaultLimit,
     };
 
@@ -1581,6 +1586,54 @@ class NostrService {
       await jsonCache.refresh("blockedUsers", {"blockedUsers": blockedUsers});
     }
     return;
+  }
+
+  _addLikesToTweet(eventMap, List<Tweet> myFeed) async {
+    // find event from tags where "e" equals event id
+    var eventId =
+        eventMap["tags"].firstWhere((element) => element[0] == "e")[1];
+    log("uFeed-eventIdReaction: " + eventId + eventMap["content"]);
+
+    // wait 5 seconds for tweet to arrive
+
+    await Future.delayed(const Duration(seconds: 5));
+
+    var tweet = myFeed.firstWhere(
+      (element) => element.id == eventId,
+      orElse: () => Tweet(
+        id: "",
+        pubkey: "",
+        userFirstName: '',
+        userUserName: '',
+        userProfilePic: '',
+        content: '',
+        imageLinks: [''],
+        tweetedAt: 0,
+        tags: [],
+        replies: [],
+        likesCount: 0,
+        commentsCount: 0,
+        retweetsCount: 0,
+      ),
+    );
+    if (tweet.id.isEmpty) {
+      log("tweet not found for reaction: $eventId");
+
+      return;
+    }
+
+    log("found tweet for reaction: $eventId, ${tweet.content}");
+
+    // check for duplicate
+    if (tweet.reactions.any((element) => element["id"] == eventMap["id"]))
+      return;
+
+    if (eventMap["content"] == "+" ||
+        eventMap["content"] == "👍" ||
+        eventMap["content"] == "🤙") {
+      tweet.reactions.add(eventMap);
+      tweet.likesCount = tweet.reactions.length;
+    }
   }
 }
 

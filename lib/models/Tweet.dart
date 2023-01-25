@@ -8,6 +8,7 @@ class Tweet {
   List<String> imageLinks;
   int tweetedAt;
   int likesCount;
+  List<dynamic> reactions = [];
   int commentsCount;
   int retweetsCount;
   List<dynamic> tags;
@@ -25,6 +26,7 @@ class Tweet {
       required this.tweetedAt,
       required this.tags,
       required this.likesCount,
+      this.reactions = const [],
       required this.commentsCount,
       required this.retweetsCount,
       required this.replies,
@@ -43,6 +45,7 @@ class Tweet {
         tags: json['tags'],
         replies: json['replies'],
         likesCount: json['likesCount'],
+        reactions: json['reactions'],
         commentsCount: json['commentsCount'],
         retweetsCount: json['retweetsCount'],
         isReply: json['isReply']);
@@ -60,6 +63,7 @@ class Tweet {
         'tags': tags,
         'replies': replies,
         'likesCount': likesCount,
+        'reactions': reactions,
         'commentsCount': commentsCount,
         'retweetsCount': retweetsCount,
         'isReply': isReply

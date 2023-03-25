@@ -165,7 +165,7 @@ class NostrService {
     var jsonString = json.encode(data);
 
     for (var relay in relays.connectedRelaysRead.entries) {
-      relay.value.socket.add(jsonString);
+      relay.value.socket.sink.add(jsonString);
     }
   }
 
@@ -301,7 +301,7 @@ class NostrService {
         var reqJson = jsonEncode(req);
 
         // close the stream
-        socketControl.socket.add(reqJson);
+        socketControl.socket.sink.add(reqJson);
         socketControl.requestInFlight.remove(event[1]);
         log("CLOSE request sent to socket Metadata: ${socketControl.id}");
       }
@@ -318,7 +318,7 @@ class NostrService {
         // send close request
         var req = ["CLOSE", event[1]];
         var reqJson = jsonEncode(req);
-        socketControl.socket.add(reqJson);
+        socketControl.socket.sink.add(reqJson);
         socketControl.requestInFlight.remove(event[1]);
         log("CLOSE request sent to socket Contacts: ${socketControl.id}");
       }
@@ -365,7 +365,7 @@ class NostrService {
         log("socket not ready");
         continue;
       }
-      relay.value.socket.add(reqJson);
+      relay.value.socket.sink.add(reqJson);
     }
   }
 
@@ -449,7 +449,7 @@ class NostrService {
 
     var jsonString = json.encode(data);
     for (var relay in relays.connectedRelaysRead.entries) {
-      relay.value.socket.add(jsonString);
+      relay.value.socket.sink.add(jsonString);
       relay.value.requestInFlight[subId] = true;
       //todo add stream
     }

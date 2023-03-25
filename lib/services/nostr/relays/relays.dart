@@ -9,9 +9,8 @@ import 'package:camelus/services/nostr/relays/relay_tracker.dart';
 import 'package:camelus/services/nostr/relays/relays_injector.dart';
 import 'package:camelus/services/nostr/relays/relays_picker.dart';
 import 'package:cross_local_storage/cross_local_storage.dart';
-
+import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:json_cache/json_cache.dart';
-import 'dart:convert';
 
 class Relays {
   final Map<String, Map<String, bool>> initRelays = {
@@ -138,22 +137,22 @@ class Relays {
     log("connect to relays $usedRelays");
 
     for (var relay in usedRelays.entries) {
-      Future<WebSocket>? socket;
+      WebSocketChannel? socket;
 
       if (relay.value["read"] == true) {
-        socket ??= WebSocket.connect(relay.key);
+        socket ??= WebSocketChannel.connect(Uri.parse(relay.key));
 
         var id = "relay-r-${Helpers().getRandomString(5)}";
 
         SocketControl socketControl = SocketControl(id, relay.key);
 
-        socket
+        socket.ready
             .then((value) => {
                   // set socket
-                  socketControl.socket = value,
+                  socketControl.socket = socket!,
                   socketControl.socketIsRdy = true,
 
-                  value.listen((event) {
+                  socket.stream.listen((event) {
                     socketControl.socketReceivedEventsCount++;
                     var eventJson = json.decode(event);
                     _receiveEventStreamController.add({
@@ -187,21 +186,21 @@ class Relays {
       }
 
       if (relay.value["write"] == true) {
-        socket ??= WebSocket.connect(relay.key);
+        socket ??= WebSocketChannel.connect(Uri.parse(relay.key));
         var id = "relay-w-${Helpers().getRandomString(5)}";
 
         SocketControl socketControl = SocketControl(id, relay.key);
 
-        socket
+        socket.ready
             .then((value) => {
-                  socketControl.socket = value,
+                  socketControl.socket = socket!,
                   socketControl.socketIsRdy = true,
                   connectedRelaysWrite[id] = socketControl,
 
                   // check if already listened to this socket
-                  if (value.hashCode !=
+                  if (socket.hashCode !=
                       connectedRelaysWrite[id]!.socket.hashCode)
-                    value.listen((event) {}, onDone: () {
+                    socket.stream.listen((event) {}, onDone: () {
                       // on disconnect
                       connectedRelaysWrite[id]!.socketIsRdy = false;
                       _reconnectToRelayWrite(id);
@@ -236,16 +235,17 @@ class Relays {
     await Future.delayed(Duration(seconds: waitTime));
     log("reconnect to relay read ${socketControl.connectionUrl}, attempt: ${socketControl.socketFailingAttempts}");
     // try to reconnect
-    WebSocket? socket;
+    WebSocketChannel? socket;
     try {
-      socket = await WebSocket.connect(socketControl.connectionUrl);
+      socket = await WebSocketChannel.connect(
+          Uri.parse(socketControl.connectionUrl));
     } catch (e) {}
 
-    if (socket?.readyState == WebSocket.open) {
+    if (socket?.ready != null) {
       socketControl.socket = socket!;
       socketControl.socketIsRdy = true;
       socketControl.socketFailingAttempts = 0;
-      socket.listen((event) {
+      socket.stream.listen((event) {
         var eventJson = json.decode(event);
         _receiveEventStreamController.add({
           "event": eventJson,
@@ -277,16 +277,17 @@ class Relays {
     // wait
     await Future.delayed(Duration(seconds: waitTime));
     // try to reconnect
-    WebSocket? socket;
+    WebSocketChannel? socket;
     try {
-      socket = await WebSocket.connect(socketControl.connectionUrl);
+      socket = await WebSocketChannel.connect(
+          Uri.parse(socketControl.connectionUrl));
     } catch (e) {}
 
-    if (socket?.readyState == WebSocket.open) {
+    if (socket?.ready != null) {
       socketControl.socket = socket!;
       socketControl.socketIsRdy = true;
       socketControl.socketFailingAttempts = 0;
-      socket.listen((event) {}, onDone: () {
+      socket.stream.listen((event) {}, onDone: () {
         // on disconnect
         connectedRelaysWrite[id]!.socketIsRdy = false;
         _reconnectToRelayWrite(id);
@@ -319,12 +320,12 @@ class Relays {
 
   Future<void> closeRelays() async {
     for (var relay in connectedRelaysRead.entries) {
-      await relay.value.socket.close();
+      await relay.value.socket.sink.close();
       // remove from array
       connectedRelaysRead.remove(relay);
     }
     for (var relay in connectedRelaysWrite.entries) {
-      await relay.value.socket.close();
+      await relay.value.socket.sink.close();
       // remove from array
       connectedRelaysWrite.remove(relay);
     }
@@ -406,7 +407,7 @@ class Relays {
 
       var jsonRequest = json.encode(specificRequest);
 
-      relay.value.socket.add(jsonRequest);
+      relay.value.socket.sink.add(jsonRequest);
       relay.value.requestInFlight[reqId] = true;
 
       if (additionalData != null) {
